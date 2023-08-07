@@ -54,7 +54,7 @@ def get_1d_sincos_pos_embed_from_grid(embed_dim, pos):
     out: (M, D)
     """
     assert embed_dim % 2 == 0
-    omega = np.arange(embed_dim // 2, dtype=np.float)
+    omega = np.arange(embed_dim // 2, dtype=np.float32)
     omega /= embed_dim / 2.0
     omega = 1.0 / 10000**omega  # (D/2,)
 
@@ -80,14 +80,15 @@ def interpolate_pos_embed(model, checkpoint_model, new_size=(64, 128)):
         orig_num_patches = pos_embed_checkpoint.shape[-2]
         patch_size = model.patch_size
         w_h_ratio = 2
+        w_h_ratio = 1
         orig_h = int((orig_num_patches // w_h_ratio) ** 0.5)
         orig_w = w_h_ratio * orig_h
         orig_size = (orig_h, orig_w)
         new_size = (new_size[0] // patch_size, new_size[1] // patch_size)
-        # print (orig_size)
-        # print (new_size)
+    
         if orig_size[0] != new_size[0]:
             print("Interpolate PEs from %dx%d to %dx%d" % (orig_size[0], orig_size[1], new_size[0], new_size[1]))
+            print('shape= ',pos_embed_checkpoint.shape)
             pos_tokens = pos_embed_checkpoint.reshape(-1, orig_size[0], orig_size[1], embedding_size).permute(
                 0, 3, 1, 2
             )

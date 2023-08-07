@@ -2,13 +2,13 @@ seed_everything: 42
 
 # ---------------------------- TRAINER -------------------------------------------
 trainer:
-  default_root_dir: ${oc.env:OUTPUT_DIR,/home/t-tungnguyen/ClimaX/exps/global_forecast_climax}
+  default_root_dir: ClimaX/exps/global_forecast_climax
 
   precision: 16
 
-  gpus: null
+  gpus: [0]
   num_nodes: 1
-  accelerator: gpu
+  accelerator: null #gpu
   strategy: ddp
 
   min_epochs: 1
@@ -128,10 +128,10 @@ model:
         ]
       img_size: [32, 64]
       patch_size: 2
-      embed_dim: 1024
-      depth: 8
+      embed_dim: 4 #1024
+      depth: 2
       decoder_depth: 2
-      num_heads: 16
+      num_heads: 2
       mlp_ratio: 4
       drop_path: 0.1
       drop_rate: 0.1
@@ -191,7 +191,7 @@ data:
     ]
   out_variables: ["geopotential_500", "temperature_850", "2m_temperature", "10m_u_component_of_wind", "10m_v_component_of_wind"]
   predict_range: 72
-  hrs_each_step: 1
+  hrs_each_step: 2400
   buffer_size: 10000
   batch_size: 128
   num_workers: 1

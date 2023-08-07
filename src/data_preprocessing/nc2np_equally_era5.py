@@ -1,6 +1,12 @@
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT license.
 
+import sys 
+PATH = "/mnt/shared/users/wessim.omezzine/"
+sys.path.append(PATH + 'ClimaX')
+sys.path.append(PATH + 'ClimaX/src')
+
+
 import glob
 import os
 

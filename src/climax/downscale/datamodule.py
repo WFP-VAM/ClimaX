@@ -27,8 +27,8 @@ from climax.pretrain.dataset import (
 )
 
 
-class GlobalForecastDataModule(LightningDataModule):
-    """DataModule for global forecast data.
+class DownscaleDataModule(LightningDataModule):
+    """DataModule for downscaling data.
 
     Args:
         root_dir (str): Root directory for sharded data.
@@ -85,6 +85,7 @@ class GlobalForecastDataModule(LightningDataModule):
         if variables is None:
             variables = self.hparams.variables
         normalize_mean = dict(np.load(os.path.join(self.hparams.root_dir, "normalize_mean.npz")))
+        print(normalize_mean)
         mean = []
         for var in variables:
             if var != "total_precipitation":

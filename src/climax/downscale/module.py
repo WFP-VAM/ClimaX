@@ -23,13 +23,14 @@ from climax.utils.metrics import (
     lat_weighted_mse,
     lat_weighted_mse_val,
     lat_weighted_rmse,
+    pearson,
 )
 from climax.utils.pos_embed import interpolate_pos_embed
 
 
 
-class GlobalForecastModule(LightningModule):
-    """Lightning module for global forecasting with the ClimaX model.
+class DownscaleModule(LightningModule):
+    """Lightning module for Downscaling with the ClimaX model.
 
     Args:
         net (ClimaX): ClimaX model.
@@ -112,7 +113,8 @@ class GlobalForecastModule(LightningModule):
 
     def training_step(self, batch: Any, batch_idx: int):
         x, y, lead_times, variables, out_variables = batch
-
+        # out_h, out_w = y.shape[-2], y.shape[-1]
+        # x = torch.nn.functional.interpolate(x, (out_h, out_w), mode="bilinear")
         loss_dict, _ = self.net.forward(x, y, lead_times, variables, out_variables, [lat_weighted_mse], lat=self.lat)
         loss_dict = loss_dict[0]
         for var in loss_dict.keys():
@@ -124,17 +126,20 @@ class GlobalForecastModule(LightningModule):
                 prog_bar=True,
             )
         loss = loss_dict["loss"]
+        
 
         return loss
 
     def validation_step(self, batch: Any, batch_idx: int):
         x, y, lead_times, variables, out_variables = batch
-
-        if self.pred_range < 24:
-            log_postfix = f"{self.pred_range}_hours"
-        else:
-            days = int(self.pred_range / 24)
-            log_postfix = f"{days}_days"
+        # out_h, out_w = y.shape[-2], y.shape[-1]
+        # x = torch.nn.functional.interpolate(x, (out_h, out_w), mode="bilinear")
+        
+        # if self.pred_range < 24:
+        #     log_postfix = f"{self.pred_range}_hours"
+        # else:
+        days = int(self.pred_range / 24)
+        log_postfix = f"{days*10}_days"
 
         all_loss_dicts = self.net.evaluate(
             x,
@@ -143,7 +148,7 @@ class GlobalForecastModule(LightningModule):
             variables,
             out_variables,
             transform=self.denormalization,
-            metrics=[lat_weighted_mse_val, lat_weighted_rmse, lat_weighted_acc],
+            metrics=[lat_weighted_mse_val, lat_weighted_rmse, lat_weighted_acc, pearson],
             lat=self.lat,
             clim=self.val_clim,
             log_postfix=log_postfix,
@@ -167,12 +172,14 @@ class GlobalForecastModule(LightningModule):
 
     def test_step(self, batch: Any, batch_idx: int):
         x, y, lead_times, variables, out_variables = batch
+        # out_h, out_w = y.shape[-2], y.shape[-1]
+        # x = torch.nn.functional.interpolate(x, (out_h, out_w), mode="bilinear")
 
         if self.pred_range < 24:
             log_postfix = f"{self.pred_range}_hours"
         else:
             days = int(self.pred_range / 24)
-            log_postfix = f"{days}_days"
+            log_postfix = f"{days*10}_days"
 
         all_loss_dicts = self.net.evaluate(
             x,
@@ -180,8 +187,8 @@ class GlobalForecastModule(LightningModule):
             lead_times,
             variables,
             out_variables,
-            transform=self.denormalization,
-            metrics=[lat_weighted_mse_val, lat_weighted_rmse, lat_weighted_acc],
+            transform=self.denormalization,            
+            metrics=[lat_weighted_mse_val, lat_weighted_rmse,lat_weighted_acc, pearson],
             lat=self.lat,
             clim=self.test_clim,
             log_postfix=log_postfix,

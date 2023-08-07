@@ -8,6 +8,7 @@ import random
 import numpy as np
 import torch
 from torch.utils.data import IterableDataset
+from scipy.ndimage import zoom
 
 
 class NpyReader(IterableDataset):
@@ -74,6 +75,7 @@ class Forecast(IterableDataset):
         self.random_lead_time = random_lead_time
         self.hrs_each_step = hrs_each_step
 
+    
     def __iter__(self):
         for data, variables, out_variables in self.dataset:
             x = np.concatenate([data[k].astype(np.float32) for k in data.keys()], axis=1)
@@ -93,6 +95,7 @@ class Forecast(IterableDataset):
             outputs = y[output_ids]
 
             yield inputs, outputs, lead_times, variables, out_variables
+
 
 
 class IndividualForecastDataIter(IterableDataset):

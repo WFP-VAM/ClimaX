@@ -6,8 +6,8 @@ import sys
 sys.path.append('/mnt/shared/users/wessim.omezzine/ClimaX/src/climax')
 sys.path.append('/mnt/shared/users/wessim.omezzine/ClimaX/src')
 
-from climax.global_forecast.datamodule import GlobalForecastDataModule
-from climax.global_forecast.module import GlobalForecastModule
+from climax.downscale.datamodule import DownscaleDataModule
+from climax.downscale.module import DownscaleModule
 from pytorch_lightning.cli import LightningCLI
 
 import torch
@@ -23,8 +23,8 @@ def main():
     print("main")
     # Initialize Lightning with the model and data modules, and instruct it to parse the config yml
     cli = LightningCLI(
-        model_class=GlobalForecastModule,
-        datamodule_class=GlobalForecastDataModule,
+        model_class=DownscaleModule,
+        datamodule_class=DownscaleDataModule,
         seed_everything_default=42,
         save_config_overwrite=True,
         run=False,

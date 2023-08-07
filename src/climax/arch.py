@@ -1,6 +1,10 @@
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT license.
 
+import sys
+sys.path.append("/mnt/shared/users/wessim.omezzine/ClimaX/src/climax/")
+sys.path.append("/mnt/shared/users/wessim.omezzine/ClimaX/src/")
+
 from functools import lru_cache
 
 import numpy as np
@@ -159,6 +163,7 @@ class ClimaX(nn.Module):
 
     @lru_cache(maxsize=None)
     def get_var_ids(self, vars, device):
+        print("self.var_map===",self.var_map)
         ids = np.array([self.var_map[var] for var in vars])
         return torch.from_numpy(ids).to(device)
 

@@ -12,10 +12,16 @@ import torch
 import torch.nn as nn
 from timm.models.vision_transformer import Block, PatchEmbed, trunc_normal_
 
+from climax.utils.verif import plot_pred
+
+
 from climax.utils.pos_embed import (
     get_1d_sincos_pos_embed_from_grid,
     get_2d_sincos_pos_embed,
 )
+
+
+import loralib as lora
 
 from .parallelpatchembed import ParallelVarPatchEmbed
 
@@ -79,7 +85,8 @@ class ClimaX(nn.Module):
 
         # positional embedding and lead time embedding
         self.pos_embed = nn.Parameter(torch.zeros(1, self.num_patches, embed_dim), requires_grad=True)
-        self.lead_time_embed = nn.Linear(1, embed_dim)
+        # self.lead_time_embed = lora.Linear(1, embed_dim, r=16 )
+        self.lead_time_embed = nn.Linear(1, embed_dim )
 
         # --------------------------------------------------------------------------
 
@@ -107,9 +114,11 @@ class ClimaX(nn.Module):
         # prediction head
         self.head = nn.ModuleList()
         for _ in range(decoder_depth):
-            self.head.append(nn.Linear(embed_dim, embed_dim))
+            # self.head.append(lora.Linear(embed_dim, embed_dim, r=16 ))
+            self.head.append(nn.Linear(embed_dim, embed_dim, ))
             self.head.append(nn.GELU())
-        self.head.append(nn.Linear(embed_dim, len(self.default_vars) * patch_size**2))
+        # self.head.append(lora.Linear(embed_dim, len(self.default_vars) * patch_size**2,r=16 ))
+        self.head.append(nn.Linear(embed_dim, len(self.default_vars) * patch_size**2, ))
         self.head = nn.Sequential(*self.head)
 
         # --------------------------------------------------------------------------
@@ -270,6 +279,7 @@ class ClimaX(nn.Module):
 
         return loss, preds
 
-    def evaluate(self, x, y, lead_times, variables, out_variables, transform, metrics, lat, clim, log_postfix):
+    def evaluate(self, x, y, lead_times, variables, out_variables, transform, metrics, lat, clim, log_postfix,plotting=False):
         _, preds = self.forward(x, y, lead_times, variables, out_variables, metric=None, lat=lat)
+        # plot_pred(preds,y, log_postfix)
         return [m(preds, y, transform, out_variables, lat, clim, log_postfix) for m in metrics]

@@ -17,7 +17,7 @@ import sys
 import numpy as np
 from scipy.interpolate import interp2d
 
-PATH = "/mnt/shared/users/wessim.omezzine/ClimaX/Data/Downscaling/data/"
+PATH = "/mnt/shared/users/wessim.omezzine/ClimaX/Data/Downscaling/Senegal/data/"
 
 
 
@@ -94,11 +94,17 @@ def nc2np(path, variables, start_year, end_year, save_dir, partition,num_shards_
             
             ds = variable_year_data
             # code = list(ds.data_vars)[1]
-            code = 'band'
+            if len(list(ds.data_vars))==2:
+                code = list(ds.data_vars)[1]
+            else :
+                code = list(ds.data_vars)[0]
+                
+                
 
             
             if len(ds[code].shape) == 3:
                 ds[code] = ds[code].expand_dims("val", axis=1)
+                print(ds, var)
                 np_vars[var] = ds[code].to_numpy()[:,:]
                 time_size,channels, y_height, y_width = np_vars[var].shape
                 out_h, out_w = y_height, y_width
@@ -108,6 +114,8 @@ def nc2np(path, variables, start_year, end_year, save_dir, partition,num_shards_
             if partition == "train":
                 var_mean_yearly = np_vars[var].mean(axis=(0, 2, 3))
                 var_std_yearly = np_vars[var].std(axis=(0, 2, 3))
+                
+    
                 
                 if var not in normalize_mean:
                     normalize_mean[var] = [var_mean_yearly]
@@ -187,14 +195,13 @@ def select_shape(array, out_lon, out_lat,n1=False):
 
 def main(
     root_dir = PATH,
-    save_dir = '/mnt/shared/users/wessim.omezzine/ClimaX/Data/Downscaling/data_npz' ,
+    save_dir = '/mnt/shared/users/wessim.omezzine/ClimaX/Data/Downscaling/Senegal/data_npz' ,
 ):
+       
     
-    
-    ndvi_1_lta = xr.open_dataset(PATH+"ndvi_1_lta.nc").fillna(0)    
-    ndvi_5 = xr.open_dataset(PATH+"ndvi_5.nc").fillna(0)
-    
-    ndvi_1 = xr.open_dataset(PATH+"ndvi_1.nc").fillna(0)
+    ndvi_1 = xr.open_dataset(PATH+"ndvi_1.nc").fillna(0)    
+    ndvi_1_lta = xr.open_dataset(PATH+"ndvi_1_lta.nc").fillna(0)
+    ndvi_5 = xr.open_dataset(PATH+"ndvi_5_near.nc").fillna(0)
     
     
     ##### TO CHANGE!!!!
@@ -211,15 +218,19 @@ def main(
     "ndvi_5": ndvi_5,
     
 }
+    ndvi_1 = ndvi_1.where(ndvi_1 >= 0, 0)
+    ndvi_1_lta = ndvi_1_lta.where(ndvi_1_lta >= 0, 0)
+    ndvi_5 = ndvi_5.where(ndvi_5 >= 0, 0)
+
    
     
     
   
     os.makedirs(save_dir, exist_ok=True)
     
-    num_shards_per_year = 6
+    num_shards_per_year = 1
     
-    nc2np(path = root_dir  ,variables = variables, start_year =2002, end_year=2018, save_dir = save_dir , partition='train',num_shards_per_year=num_shards_per_year )
+    nc2np(path = root_dir  ,variables = variables, start_year =2003, end_year=2018, save_dir = save_dir , partition='train',num_shards_per_year=num_shards_per_year )
     nc2np(path = root_dir  ,variables = variables, start_year =2018, end_year=2020, save_dir = save_dir , partition='val',num_shards_per_year=num_shards_per_year)
     nc2np(path = root_dir  ,variables = variables, start_year =2020, end_year=2023, save_dir = save_dir , partition='test', num_shards_per_year=num_shards_per_year)
     

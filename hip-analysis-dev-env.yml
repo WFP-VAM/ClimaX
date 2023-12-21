@@ -1,0 +1,32 @@
+name: climax
+channels:
+  - https://conda.anaconda.org/conda-forge
+  - https://data.earthobservation.vam.wfp.org/hdc
+dependencies:
+  - python =3.10
+  - pip >=22
+  - hdc-algo >=0.1.2
+  - rioxarray >=0.13.3
+  - geopandas
+  - dask
+  - pystac >=1.7.2
+  - odc-stac >=0.3.5
+  - pystac-client
+  - planetary-computer >=1.0.0
+  - boto3
+  - zarr
+  - jupyterlab
+  - xclim
+  - matplotlib
+  - joblib
+
+  ## visualization
+  - holoviews
+  - panel
+  - param
+
+  # tests and dev
+  ## to use from jupyter-lab: `python -m ipykernel install --user --name hip-analysis-dev-env`
+  - ipykernel
+  - pytest
+  - black

@@ -4,9 +4,9 @@
 import glob
 import os
 import sys
-sys.path.append('/mnt/shared/users/wessim.omezzine/ClimaX/src/climax')
-sys.path.append('/mnt/shared/users/wessim.omezzine/ClimaX/src/')
-sys.path.append("/mnt/shared/users/wessim.omezzine/hip-analysis")
+sys.path.append('/s3/scratch/wessim.omezzine/ClimaX/src/climax')
+sys.path.append('/s3/scratch/wessim.omezzine/ClimaX/src/')
+sys.path.append("/s3/scratch/wessim.omezzine/ClimaX/hip-analysis")
 
 import click
 import numpy as np
@@ -86,19 +86,7 @@ def nc2np(path, variables, start_year, end_year, save_dir, partition,num_shards_
             
             if len(ds[code].shape) == 3:
                 ds[code] = ds[code].expand_dims("val", axis=1)
-                
-                # Resampling for downscaling
-                if i >1: 
-                    data = ds[code].to_numpy()[:,:]
-                    data_resized = zoom(data, (1, out_h / data.shape[-2], out_w / data.shape[-1]), mode="nearest")
-                    print("data ===",data_resized.shape)
-                    np_vars[var] = data
-                    
-                else:
-                    np_vars[var] = ds[code].to_numpy()[:,:]
-                    time_size, y_height, y_width = np_vars[var].shape
-                    out_h, out_w = y_height, y_width
-                    print("out_h, out_w", out_h, out_w)
+                np_vars[var] = ds[code].to_numpy()[:,:]
                 
 
             if partition == "train":
@@ -183,31 +171,30 @@ def select_shape(array, out_lon, out_lat,n1=False):
     return array
 
 def main(
-    root_dir = PATH + 'ClimaX/Data/CHIRPS_MODIS/data',
-    save_dir = PATH + 'ClimaX/Data/CHIRPS_MODIS/data_npz' ,
+    root_dir = PATH + 'ClimaX/Data/forecasting/jordan/data/',
+    save_dir = PATH + 'ClimaX/Data/forecasting/jordan/data_npz/' ,
 ):
     
     
-    rfh = xr.open_dataset("/mnt/shared/users/wessim.omezzine/ClimaX/Data/CHIRPS_MODIS/data/rfh.nc").fillna(0)
-    r1h_dekad = xr.open_dataset("/mnt/shared/users/wessim.omezzine/ClimaX/Data/CHIRPS_MODIS/data/r1h_dekad.nc").fillna(0)
-    r2h_dekad = xr.open_dataset("/mnt/shared/users/wessim.omezzine/ClimaX/Data/CHIRPS_MODIS/data/r2h_dekad.nc").fillna(0)
-    r3h_dekad = xr.open_dataset("/mnt/shared/users/wessim.omezzine/ClimaX/Data/CHIRPS_MODIS/data/r3h_dekad.nc").fillna(0)
-    lst_5 = xr.open_dataset("/mnt/shared/users/wessim.omezzine/ClimaX/Data/CHIRPS_MODIS/data/lst_5.nc").fillna(0)
-    ndvi_5 = xr.open_dataset("/mnt/shared/users/wessim.omezzine/ClimaX/Data/CHIRPS_MODIS/data/ndvi_5.nc").fillna(0)
-    ndvi_1 = xr.open_dataset("/mnt/shared/users/wessim.omezzine/ClimaX/Data/CHIRPS_MODIS/data/ndvi_1.nc").fillna(0)
+    rfh = xr.open_dataset(root_dir+"rfh.nc").fillna(0)
+    r1h_dekad = xr.open_dataset(root_dir+"r1h_dekad.nc").fillna(0)
+    r2h_dekad = xr.open_dataset(root_dir+"r2h_dekad.nc").fillna(0)
+    r3h_dekad = xr.open_dataset(root_dir+"r3h_dekad.nc").fillna(0)
+    lst_5 = xr.open_dataset(root_dir+"lst_5.nc").fillna(0)
+    ndvi_5 = xr.open_dataset(root_dir+"ndvi_5.nc").fillna(0)
     
     
     ##### TO CHANGE!!!!
-    ndvi_1 = select_shape(ndvi_1, 250, 150, True )
+    # ndvi_1 = select_shape(ndvi_1, 250, 150, True )
     
-    print(rfh.dims)
+#     print(rfh.dims)
     
-    rfh = select_shape(rfh, rfh.dims["latitude"], rfh.dims["longitude"])
-    lst_5 = select_shape(lst_5, lst_5.dims["latitude"], lst_5.dims["longitude"])
-    ndvi_5 = select_shape(ndvi_5, ndvi_5.dims["latitude"], ndvi_5.dims["longitude"])
-    r1h_dekad = select_shape(r1h_dekad, r1h_dekad.dims["latitude"], r1h_dekad.dims["longitude"])
-    r2h_dekad = select_shape(r2h_dekad, r2h_dekad.dims["latitude"], r2h_dekad.dims["longitude"])
-    r3h_dekad = select_shape(r3h_dekad, r3h_dekad.dims["latitude"], r3h_dekad.dims["longitude"])
+#     rfh = select_shape(rfh, rfh.dims["latitude"], rfh.dims["longitude"])
+#     lst_5 = select_shape(lst_5, lst_5.dims["latitude"], lst_5.dims["longitude"])
+#     ndvi_5 = select_shape(ndvi_5, ndvi_5.dims["latitude"], ndvi_5.dims["longitude"])
+#     r1h_dekad = select_shape(r1h_dekad, r1h_dekad.dims["latitude"], r1h_dekad.dims["longitude"])
+#     r2h_dekad = select_shape(r2h_dekad, r2h_dekad.dims["latitude"], r2h_dekad.dims["longitude"])
+#     r3h_dekad = select_shape(r3h_dekad, r3h_dekad.dims["latitude"], r3h_dekad.dims["longitude"])
         
     
     
@@ -219,8 +206,6 @@ def main(
     "r3h_dekad": r3h_dekad, 
     "lst_5": lst_5,  
     "ndvi_5": ndvi_5,
-    "ndvi_1": ndvi_1
-
 }
     
     
@@ -228,15 +213,15 @@ def main(
   
     os.makedirs(save_dir, exist_ok=True)
     
-    num_shards_per_year = 6
+    num_shards_per_year = 3
     
     nc2np(path = root_dir  ,variables = variables, start_year =2002, end_year=2018, save_dir = save_dir , partition='train',num_shards_per_year=num_shards_per_year )
     nc2np(path = root_dir  ,variables = variables, start_year =2018, end_year=2020, save_dir = save_dir , partition='val',num_shards_per_year=num_shards_per_year)
     nc2np(path = root_dir  ,variables = variables, start_year =2020, end_year=2023, save_dir = save_dir , partition='test', num_shards_per_year=num_shards_per_year)
     
     # save lat and lon data
-    ps = glob.glob(PATH + 'ClimaX/Data/CHIRPS_MODIS/data/lst_5.nc')
-    x = xr.open_mfdataset(ps[0], parallel=True).isel(latitude=slice(0, ndvi_1.dims["latitude"]))
+    ps = glob.glob(root_dir+ 'lst_5.nc')
+    x = xr.open_mfdataset(ps[0], parallel=True).isel(latitude=slice(0, ndvi_5.dims["latitude"]))
     
         
     lat = x["latitude"].to_numpy()

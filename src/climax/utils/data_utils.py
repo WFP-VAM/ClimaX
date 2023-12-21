@@ -6,7 +6,7 @@ import torch
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-DEKAD_PER_YEAR = 36
+DEKAD_PER_YEAR = 765
 
 NAME_TO_VAR = {
     "2m_temperature": "t2m",

@@ -36,6 +36,90 @@ def mse(pred, y, vars, lat=None, mask=None):
     return loss_dict
 
 
+import torch
+import numpy as np
+
+def huber_loss(error, delta=.5):
+    """
+    Calculate the Huber loss.
+    """
+    abs_error = torch.abs(error)
+    quadratic = torch.where(abs_error < delta, 0.5 * error ** 2, delta * (abs_error - 0.5 * delta))
+    return quadratic
+
+def loss_function_training(pred, y, vars, lat,var_weights=[.7,.3], mask=None, delta=1.):
+    """
+    Latitude weighted Huber loss.
+
+    Allows to weight the loss by the cosine of the latitude to account for gridding differences at equator vs. poles.
+
+    Args:
+        y: [B, V, H, W]
+        pred: [B, V, H, W]
+        vars: list of variable names
+        lat: H
+        delta: threshold for Huber loss
+    """
+
+    error = pred - y  # [N, C, H, W]
+
+    # Calculate the Huber loss
+    error = huber_loss(error, delta)
+
+    # Latitude weights
+    w_lat = np.cos(np.deg2rad(lat))
+    w_lat = w_lat / w_lat.mean()  # (H, )
+    w_lat = torch.from_numpy(w_lat).unsqueeze(0).unsqueeze(-1).to(dtype=error.dtype, device=error.device)  # (1, H, 1)
+
+    loss_dict = {}
+    with torch.no_grad():
+        for i, var in enumerate(vars):
+            loss_dict[var] = torch.mean(torch.sqrt(var_weights[i] * torch.mean(error[:, i] * w_lat, dim=(-2, -1)))) + torch.abs(pred.mean() - y.mean())
+
+    if mask is not None:
+        loss_dict["loss"] = ((error * w_lat.unsqueeze(1)).mean(dim=1) * mask).sum() / mask.sum()
+    else:
+        loss_dict["loss"] = (error * w_lat.unsqueeze(1)).mean(dim=1).mean()
+
+    return loss_dict
+
+
+
+def loss_function_training2(pred, y, vars, lat, mask=None):
+    """Latitude weighted mean squared error
+
+    Allows to weight the loss by the cosine of the latitude to account for gridding differences at equator vs. poles.
+
+    Args:
+        y: [B, V, H, W]
+        pred: [B, V, H, W]
+        vars: list of variable names
+        lat: H
+    """
+    
+
+    error = (pred - y) ** 2  # [N, C, H, W]
+
+    # lattitude weights
+    w_lat = np.cos(np.deg2rad(lat))
+    w_lat = w_lat / w_lat.mean()  # (H, )
+    w_lat = torch.from_numpy(w_lat).unsqueeze(0).unsqueeze(-1).to(dtype=error.dtype, device=error.device)  # (1, H, 1)
+
+    loss_dict = {}
+    with torch.no_grad():
+        for i, var in enumerate(vars):
+            loss_dict[var] =   torch.mean(torch.sqrt(torch.mean(error[:, i] * w_lat, dim=(-2, -1))))  + torch.abs(pred.mean() - y.mean())
+    # (error[:, i] * w_lat).mean() + (torch.abs(pred- y)*w_lat).mean() +
+    if mask is not None:
+        loss_dict["loss"] = ((error * w_lat.unsqueeze(1)).mean(dim=1) * mask).sum() / mask.sum()
+    else:
+        loss_dict["loss"] = (error * w_lat.unsqueeze(1)).mean(dim=1).mean()
+    
+    
+    
+    return loss_dict
+
+
 def lat_weighted_mse(pred, y, vars, lat, mask=None):
     """Latitude weighted mean squared error
 
@@ -59,9 +143,13 @@ def lat_weighted_mse(pred, y, vars, lat, mask=None):
     with torch.no_grad():
         for i, var in enumerate(vars):
             if mask is not None:
-                loss_dict[var] = (error[:, i] * w_lat * mask).sum() / mask.sum()
+                loss_dict[var] = (error[:, i] * w_lat * mask).sum() / mask.sum() +torch.abs(pred- y).mean() + torch.mean(
+                torch.sqrt(torch.mean(error[:, i] * w_lat, dim=(-2, -1)))
+            )
             else:
-                loss_dict[var] = (error[:, i] * w_lat).mean()
+                loss_dict[var] = (error[:, i] * w_lat).mean() + torch.abs(pred- y).mean() + torch.mean(
+                torch.sqrt(torch.mean(error[:, i] * w_lat, dim=(-2, -1))) 
+            )
 
     if mask is not None:
         loss_dict["loss"] = ((error * w_lat.unsqueeze(1)).mean(dim=1) * mask).sum() / mask.sum()
@@ -71,6 +159,65 @@ def lat_weighted_mse(pred, y, vars, lat, mask=None):
     
     
     return loss_dict
+
+def lat_weighted_mean_bias(pred, y, vars, lat):
+    """
+    y: [N, T, 3, H, W]
+    pred: [N, T, 3, H, W]
+    vars: list of variable names
+    lat: H
+    """
+    
+    # Latitude weights
+    w_lat = np.cos(np.deg2rad(lat))
+    w_lat = w_lat / w_lat.mean()  # (H, )
+    w_lat = torch.from_numpy(w_lat).unsqueeze(0).unsqueeze(-1).to(dtype=pred.dtype, device=pred.device)  # [1, H, 1]
+
+    loss_dict = {}
+    with torch.no_grad():
+        for i, var in enumerate(vars):
+            pred_ = pred[:, i].flatten()
+            y_ = y[:, i].flatten()
+            pred_, y_ = remove_nans(pred_, y_)
+            loss_dict[f"mean_absolute_error_{var}"] = torch.abs(pred_ - y_).mean()
+
+    loss_dict["loss"] = np.mean([loss_dict[k].cpu() for k in loss_dict.keys()])
+
+    return loss_dict
+
+
+
+def lat_weighted_rmse_train(pred, y, vars, lat):
+    """Latitude weighted root mean squared error
+
+    Args:
+        y: [B, V, H, W]
+        pred: [B, V, H, W]
+        vars: list of variable names
+        lat: H
+    """
+
+    # pred = transform(pred)
+    # y = transform(y)
+
+    error = (pred - y) ** 2  # [B, V, H, W]
+
+    # lattitude weights
+    w_lat = np.cos(np.deg2rad(lat))
+    w_lat = w_lat / w_lat.mean()  # (H, )
+    w_lat = torch.from_numpy(w_lat).unsqueeze(0).unsqueeze(-1).to(dtype=error.dtype, device=error.device)
+
+    loss_dict = {}
+    with torch.no_grad():
+        for i, var in enumerate(vars):
+            loss_dict[var] = torch.mean(
+                torch.sqrt(torch.mean(error[:, i] * w_lat, dim=(-2, -1)))
+            )
+
+    loss_dict["w_rmse_train"] = np.mean([loss_dict[k].cpu() for k in loss_dict.keys()])
+
+    return loss_dict
+
 
 
 def lat_weighted_mse_val(pred, y, transform, vars, lat, clim, log_postfix):
@@ -239,6 +386,8 @@ def lat_weighted_nrmse(pred, y, transform, vars, lat, log_steps, log_days, clim)
     vars: list of variable names
     lat: H
     """
+    print("pearson pred",pred.shape)
+    print("pearson y",y.shape)
     nrmses = lat_weighted_nrmses(pred, y, transform, vars, lat, log_steps, log_days, clim)
     nrmseg = lat_weighted_nrmseg(pred, y, transform, vars, lat, log_steps, log_days, clim)
     loss_dict = {}
@@ -284,37 +433,48 @@ def pearson(pred, y, transform, vars, lat, clim, log_postfix):
 
     return loss_dict
 
-
-def lat_weighted_mean_bias(pred, y, transform, vars, lat, log_steps, log_days, clim):
+def spearman(pred, y, transform,vars, lat, clim, log_postfix):
     """
     y: [N, T, 3, H, W]
     pred: [N, T, 3, H, W]
     vars: list of variable names
     lat: H
     """
-    
-    
 
     pred = transform(pred)
     y = transform(y)
 
-    # lattitude weights
-    w_lat = np.cos(np.deg2rad(lat))
-    w_lat = w_lat / w_lat.mean()  # (H, )
-    w_lat = torch.from_numpy(w_lat).unsqueeze(0).unsqueeze(-1).to(dtype=pred.dtype, device=pred.device)  # [1, H, 1]
+    loss_dict = {}
+    with torch.no_grad():
+        for i, var in enumerate(vars):
+            pred_, y_ = pred[:, i].flatten(), y[:, i].flatten()
+            pred_, y_ = remove_nans(pred_, y_)
+            loss_dict[f"spearmanr_{var}_{log_postfix}"] = stats.spearmanr(pred_.cpu().numpy(), y_.cpu().numpy())[0]
+
+    loss_dict["spearmanr"] = np.mean([loss_dict[k] for k in loss_dict.keys()])
+
+    return loss_dict
+
+def mean_bias(pred, y, transform, vars, lat, clim, log_postfix):
+    """
+    y: [B, V, H, W]
+    pred: [B, V, H, W]
+    vars: list of variable names
+    lat: H
+    """
+
+    pred = transform(pred)
+    y = transform(y)
 
     loss_dict = {}
     with torch.no_grad():
         for i, var in enumerate(vars):
-            for day, step in zip(log_days, log_steps):
-                pred_, y_ = pred[:, step - 1, i].flatten(), y[:, step - 1, i].flatten()
-                pred_, y_ = remove_nans(pred_, y_)
-                loss_dict[f"mean_bias_{var}_day_{day}"] = pred_.mean() - y_.mean()
-
-                # pred_mean = torch.mean(w_lat * pred[:, step - 1, i])
-                # y_mean = torch.mean(w_lat * y[:, step - 1, i])
-                # loss_dict[f"mean_bias_{var}_day_{day}"] = y_mean - pred_mean
+            pred_, y_ = pred[:, i].flatten(), y[:, i].flatten()
+            pred_, y_ = remove_nans(pred_, y_)
+            loss_dict[f"mean_bias_{var}_{log_postfix}"] = pred_.mean() - y_.mean()
 
     loss_dict["mean_bias"] = np.mean([loss_dict[k].cpu() for k in loss_dict.keys()])
 
     return loss_dict
+
+
